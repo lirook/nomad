@@ -24,6 +24,7 @@ import (
 	"github.com/hashicorp/nomad/drivers/docker/docklog"
 	"github.com/hashicorp/nomad/drivers/shared/capabilities"
 	"github.com/hashicorp/nomad/drivers/shared/eventer"
+	"github.com/hashicorp/nomad/drivers/shared/hostnames"
 	"github.com/hashicorp/nomad/drivers/shared/resolvconf"
 	nstructs "github.com/hashicorp/nomad/nomad/structs"
 	"github.com/hashicorp/nomad/plugins/base"
@@ -952,6 +953,26 @@ func (d *Driver) createContainerConfig(task *drivers.TaskConfig, driverConfig *T
 			return c, err
 		}
 		hostConfig.Mounts = append(hostConfig.Mounts, *hm)
+	}
+
+	// Setup /etc/hosts
+	if task.NetworkIsolation != nil {
+		etcHostMount, err := hostnames.GenerateEtcHostsMount(
+			task.TaskDir().Dir, task.NetworkIsolation)
+		if err != nil {
+			return c, fmt.Errorf("failed to build mount for /etc/hosts: %v", err)
+		}
+		if etcHostMount != nil {
+			hostConfig.Mounts = append(hostConfig.Mounts, docker.HostMount{
+				Target:   etcHostMount.TaskPath,
+				Source:   etcHostMount.HostPath,
+				Type:     "bind",
+				ReadOnly: etcHostMount.Readonly,
+				BindOptions: &docker.BindOptions{
+					Propagation: etcHostMount.PropagationMode,
+				},
+			})
+		}
 	}
 
 	// Setup DNS

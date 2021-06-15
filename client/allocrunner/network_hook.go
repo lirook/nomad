@@ -9,6 +9,8 @@ import (
 	"github.com/hashicorp/nomad/plugins/drivers"
 )
 
+const dockerNetSpecLabelKey = "docker_sandbox_container_id"
+
 type networkIsolationSetter interface {
 	SetNetworkIsolation(*drivers.NetworkIsolationSpec)
 }
@@ -106,7 +108,10 @@ func (h *networkHook) Prerun() error {
 		if err != nil {
 			return fmt.Errorf("failed to configure networking for alloc: %v", err)
 		}
-
+		h.spec.HostsConfig = &drivers.HostsConfig{
+			Address:  status.Address,
+			Hostname: spec.Labels[dockerNetSpecLabelKey][:12], // TODO: make safe
+		}
 		h.networkStatusSetter.SetNetworkStatus(status)
 	}
 	return nil
